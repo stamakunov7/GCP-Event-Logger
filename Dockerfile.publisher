@@ -10,13 +10,25 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     zlib1g-dev \
     libabsl-dev \
+    curl \
+    zip \
+    unzip \
+    tar \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Google Cloud C++ libraries
+# Install vcpkg for dependency management
+WORKDIR /tmp
+RUN git clone https://github.com/Microsoft/vcpkg.git
+WORKDIR /tmp/vcpkg
+RUN ./bootstrap-vcpkg.sh
+ENV VCPKG_ROOT=/tmp/vcpkg
+
+# Install Google Cloud C++ libraries using vcpkg
 WORKDIR /tmp
 RUN git clone --depth=1 https://github.com/googleapis/google-cloud-cpp.git
 WORKDIR /tmp/google-cloud-cpp
 RUN cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_TOOLCHAIN_FILE=/tmp/vcpkg/scripts/buildsystems/vcpkg.cmake \
     -DGOOGLE_CLOUD_CPP_ENABLE=pubsub \
     -DBUILD_TESTING=OFF
 RUN cmake --build build --target install -j$(nproc)

@@ -1,0 +1,59 @@
+steps:
+  # Build publisher image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'Dockerfile.publisher'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/publisher:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/publisher:latest'
+      - '.'
+
+  # Build subscriber image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'Dockerfile.subscriber'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/subscriber:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/subscriber:latest'
+      - '.'
+
+  # Push publisher image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/publisher:$BUILD_ID'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/publisher:latest'
+
+  # Push subscriber image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/subscriber:$BUILD_ID'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/subscriber:latest'
+
+images:
+  - 'gcr.io/$PROJECT_ID/publisher:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/publisher:latest'
+  - 'gcr.io/$PROJECT_ID/subscriber:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/subscriber:latest'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '3600s'
+
