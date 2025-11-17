@@ -12,11 +12,11 @@ namespace pubsub = google::cloud::pubsub;
 
 int main(int argc, char* argv[]) {
   // Get environment variables
-  const char* project_id = std::getenv("PROJECT_ID");
+  const char* project_id = std::getenv("GOOGLE_CLOUD_PROJECT");
   const char* topic_id = std::getenv("PUBSUB_TOPIC");
   
   if (!project_id) {
-    std::cerr << "ERROR: PROJECT_ID environment variable not set\n";
+    std::cerr << "ERROR: GOOGLE_CLOUD_PROJECT environment variable not set\n";
     return 1;
   }
   

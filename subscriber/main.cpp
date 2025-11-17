@@ -49,13 +49,13 @@ std::string generate_uuid() {
 
 int main(int argc, char* argv[]) {
   // Get environment variables
-  const char* project_id = std::getenv("PROJECT_ID");
+  const char* project_id = std::getenv("GOOGLE_CLOUD_PROJECT");
   const char* subscription_id = std::getenv("PUBSUB_SUBSCRIPTION");
   const char* instance_id = std::getenv("SPANNER_INSTANCE");
   const char* database_id = std::getenv("SPANNER_DATABASE");
   
   if (!project_id) {
-    std::cerr << "ERROR: PROJECT_ID environment variable not set\n";
+    std::cerr << "ERROR: GOOGLE_CLOUD_PROJECT environment variable not set\n";
     return 1;
   }
   
