@@ -31,6 +31,32 @@ CREATE TABLE Events (
   EventText STRING(MAX) NOT NULL,
   CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp = true)
 ) PRIMARY KEY (EventId);
+
+-- Index for efficient time-based queries
+CREATE INDEX EventsByCreatedAt ON Events(CreatedAt DESC);
+```
+
+The schema is optimized for low-latency writes:
+- Primary key on `EventId` (UUID) for fast lookups
+- `COMMIT_TIMESTAMP` for automatic timestamping without extra round-trips
+- Secondary index on `CreatedAt DESC` for efficient time-range queries
+- `STRING(MAX)` for `EventText` to avoid length constraints
+
+### Pub/Sub reliability
+The subscription is configured with retry and dead-letter handling:
+- **Retry policy**: Messages are retried up to 5 times with exponential backoff
+- **Dead-letter topic**: Messages that fail after max retries are forwarded to `event-logs-dlq` for manual inspection
+- **Ack deadline**: 10 seconds (messages are redelivered if not acknowledged)
+
+To set this up:
+```bash
+# Create dead-letter topic
+gcloud pubsub topics create event-logs-dlq
+
+# Configure subscription with dead-letter policy
+gcloud pubsub subscriptions update event-logs-sub \
+  --dead-letter-topic=event-logs-dlq \
+  --max-delivery-attempts=5
 ```
 
 ## Local development
