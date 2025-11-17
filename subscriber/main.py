@@ -1,5 +1,7 @@
 import os
 import uuid
+import threading
+from flask import Flask
 from google.cloud import pubsub_v1, spanner
 
 # Environment variables
@@ -12,6 +14,13 @@ DATABASE_ID = os.environ.get('SPANNER_DATABASE', 'event-logs-db')
 spanner_client = spanner.Client(project=PROJECT_ID)
 instance = spanner_client.instance(INSTANCE_ID)
 database = instance.database(DATABASE_ID)
+
+# Flask app for health check
+app = Flask(__name__)
+
+@app.route('/health', methods=['GET'])
+def health():
+    return {'status': 'healthy'}, 200
 
 def callback(message):
     """Process messages from Pub/Sub"""
@@ -44,7 +53,7 @@ def callback(message):
         print(f'Error processing message: {str(e)}')
         message.nack()
 
-def main():
+def start_subscriber():
     """Subscribe to Pub/Sub and process messages"""
     subscriber = pubsub_v1.SubscriberClient()
     subscription_path = subscriber.subscription_path(PROJECT_ID, SUBSCRIPTION_ID)
@@ -58,14 +67,17 @@ def main():
     
     streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
     
-    print('Press Ctrl+C to stop...')
-    
     try:
         streaming_pull_future.result()
-    except KeyboardInterrupt:
-        streaming_pull_future.cancel()
-        print('\nSubscriber stopped.')
+    except Exception as e:
+        print(f'Subscriber error: {str(e)}')
 
 if __name__ == '__main__':
-    main()
+    # Start subscriber in background thread
+    subscriber_thread = threading.Thread(target=start_subscriber, daemon=True)
+    subscriber_thread.start()
+    
+    # Start Flask health check server
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
 

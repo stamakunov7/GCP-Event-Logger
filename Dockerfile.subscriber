@@ -9,5 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY subscriber/main.py .
 
-# Run subscriber
+# Set environment variables
+ENV PORT=8080
+
+# Run subscriber with Flask for health checks
 CMD ["python", "main.py"]
