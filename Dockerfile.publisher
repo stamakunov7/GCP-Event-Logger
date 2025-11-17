@@ -49,10 +49,12 @@ RUN cmake --build build --target install -j$(nproc)
 
 # Build application
 WORKDIR /app
-COPY CMakeLists.txt publisher/CMakeLists.txt publisher/
-COPY publisher/main.cpp publisher/
-RUN cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Release
-RUN cmake --build build -j$(nproc)
+# Copy the full CMake project so the top-level CMakeLists.txt is at /app
+COPY CMakeLists.txt ./
+COPY publisher ./publisher
+COPY subscriber ./subscriber
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+RUN cmake --build build --target publisher -j$(nproc)
 
 # Runtime stage
 FROM gcr.io/google.com/cloudsdktool/cloud-sdk:latest
