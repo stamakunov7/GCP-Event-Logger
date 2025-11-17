@@ -4,6 +4,7 @@ target_link_libraries(subscriber
   PRIVATE
     google-cloud-cpp::pubsub
     google-cloud-cpp::spanner
+    google-cloud-cpp::common
     Threads::Threads
 )
 
