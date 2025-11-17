@@ -1,0 +1,98 @@
+# GCP Event Logger
+
+Two small Python services that turn any HTTP event into a durable record inside Google Cloud. The publisher exposes a `/log` endpoint, drops every payload onto Pub/Sub, and the subscriber pulls those messages and writes them into a Spanner table. Both services expose `/health` so you can keep an eye on them.
+
+## What’s inside
+- `publisher/`: Flask app that accepts `{"event": "..."}` JSON and publishes to Pub/Sub.
+- `subscriber/`: Background Pub/Sub subscriber that stores each event in the `Events` table (columns `EventId`, `EventText`, `CreatedAt`) and serves a simple health check.
+- `Dockerfile.publisher` / `Dockerfile.subscriber`: Two-stage images used in Cloud Build or locally.
+- `cloudbuild.yaml`: Builds and pushes both images (`gcr.io/$PROJECT_ID/publisher` and `.../subscriber`).
+
+## Environment
+Set these variables for both local runs and container deployments:
+
+| Variable | Publisher | Subscriber |
+| --- | --- | --- |
+| `GOOGLE_CLOUD_PROJECT` | ✅ | ✅ |
+| `PUBSUB_TOPIC` | ✅ | – |
+| `PUBSUB_SUBSCRIPTION` | – | ✅ |
+| `SPANNER_INSTANCE` | – | ✅ |
+| `SPANNER_DATABASE` | – | ✅ |
+| `PORT` (optional) | ✅ | ✅ |
+
+The subscriber expects a Spanner instance/database with an `Events` table containing the columns listed above. Both services use Application Default Credentials (ADC), so run them where the default service account has Pub/Sub and Spanner permissions or provide a service-account key via `GOOGLE_APPLICATION_CREDENTIALS`.
+
+### Spanner schema
+Use this DDL once per database to create the table expected by the subscriber:
+
+```sql
+CREATE TABLE Events (
+  EventId STRING(36) NOT NULL,
+  EventText STRING(MAX) NOT NULL,
+  CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp = true)
+) PRIMARY KEY (EventId);
+```
+
+## Local development
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r publisher/requirements.txt
+pip install -r subscriber/requirements.txt
+
+# Publisher
+export GOOGLE_CLOUD_PROJECT=your-project
+export PUBSUB_TOPIC=event-logs-topic
+python publisher/main.py
+
+# Subscriber (in another shell)
+export PUBSUB_SUBSCRIPTION=event-logs-sub
+export SPANNER_INSTANCE=event-logger-instance
+export SPANNER_DATABASE=event-logs-db
+python subscriber/main.py
+```
+
+POST an event:
+```bash
+curl -X POST http://localhost:8080/log \
+  -H "Content-Type: application/json" \
+  -d '{"event":"demo from README"}'
+```
+
+## Building containers
+Local Docker builds:
+```bash
+docker build -f Dockerfile.publisher -t publisher:local .
+docker build -f Dockerfile.subscriber -t subscriber:local .
+```
+
+Cloud Build (pushes both images defined in `cloudbuild.yaml`):
+```bash
+gcloud builds submit --config cloudbuild.yaml
+```
+
+### Deploying to Cloud Run (example)
+```bash
+# Publisher
+gcloud run deploy event-logger-publisher \
+  --image gcr.io/$PROJECT_ID/publisher:latest \
+  --region=us-central1 \
+  --platform=managed \
+  --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_TOPIC=event-logs-topic \
+  --allow-unauthenticated
+
+# Subscriber
+gcloud run deploy event-logger-subscriber \
+  --image gcr.io/$PROJECT_ID/subscriber:latest \
+  --region=us-central1 \
+  --platform=managed \
+  --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_SUBSCRIPTION=event-logs-sub,\
+SPANNER_INSTANCE=event-logger-instance,SPANNER_DATABASE=event-logs-db
+```
+
+Grant each service account Pub/Sub and Spanner permissions, or specify `--service-account` if you need separate principals.
+
+## Health checks
+- Publisher: `GET /health` returns `{"status": "healthy"}`.
+- Subscriber: Flask app on its configured port exposes the same endpoint; the worker thread continues to process messages in the background.
+
+That’s it—small, auditable, and ready for your event trail.
