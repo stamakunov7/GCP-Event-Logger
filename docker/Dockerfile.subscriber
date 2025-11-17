@@ -1,0 +1,48 @@
+FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:latest as gcloud
+
+# Build stage
+FROM ubuntu:22.04 as builder
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Google Cloud C++ libraries
+WORKDIR /tmp
+RUN git clone --depth=1 https://github.com/googleapis/google-cloud-cpp.git
+WORKDIR /tmp/google-cloud-cpp
+RUN cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Release \
+    -DGOOGLE_CLOUD_CPP_ENABLE="pubsub;spanner" \
+    -DBUILD_TESTING=OFF
+RUN cmake --build build --target install -j$(nproc)
+
+# Build application
+WORKDIR /app
+COPY CMakeLists.txt subscriber/CMakeLists.txt subscriber/
+COPY subscriber/main.cpp subscriber/
+RUN cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Release
+RUN cmake --build build -j$(nproc)
+
+# Runtime stage
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libcurl4 \
+    libssl3 \
+    zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=gcloud /google-cloud-sdk /google-cloud-sdk
+ENV PATH=/google-cloud-sdk/bin:$PATH
+
+WORKDIR /app
+COPY --from=builder /app/build/subscriber/subscriber /app/subscriber
+
+CMD ["/app/subscriber"]
