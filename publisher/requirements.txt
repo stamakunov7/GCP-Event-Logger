@@ -1,0 +1,4 @@
+flask==3.0.0
+google-cloud-pubsub==2.23.0
+gunicorn==21.2.0
+

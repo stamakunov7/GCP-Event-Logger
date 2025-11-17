@@ -1,75 +1,16 @@
-# Build stage
-FROM ubuntu:22.04 as builder
-
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    cmake \
-    git \
-    pkg-config \
-    libcurl4-openssl-dev \
-    libssl-dev \
-    zlib1g-dev \
-    libabsl-dev \
-    curl \
-    zip \
-    unzip \
-    tar \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install vcpkg for dependency management
-WORKDIR /tmp
-RUN git clone https://github.com/Microsoft/vcpkg.git
-WORKDIR /tmp/vcpkg
-RUN ./bootstrap-vcpkg.sh
-ENV VCPKG_ROOT=/tmp/vcpkg
-
-# Install Google Cloud C++ libraries using vcpkg
-WORKDIR /tmp
-RUN git clone --depth=1 https://github.com/googleapis/google-cloud-cpp.git
-WORKDIR /tmp/google-cloud-cpp
-RUN cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_TOOLCHAIN_FILE=/tmp/vcpkg/scripts/buildsystems/vcpkg.cmake \
-    -DGOOGLE_CLOUD_CPP_ENABLE=pubsub \
-    -DBUILD_TESTING=OFF
-RUN cmake --build build --target install -j$(nproc)
-
-# Install cpp-httplib
-WORKDIR /tmp
-RUN git clone --depth=1 --branch v0.15.3 https://github.com/yhirose/cpp-httplib.git
-WORKDIR /tmp/cpp-httplib
-RUN cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Release
-RUN cmake --build build --target install -j$(nproc)
-
-# Install nlohmann/json
-WORKDIR /tmp
-RUN git clone --depth=1 --branch v3.11.3 https://github.com/nlohmann/json.git
-WORKDIR /tmp/json
-RUN cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=OFF
-RUN cmake --build build --target install -j$(nproc)
-
-# Build application
-WORKDIR /app
-# Copy the full CMake project so the top-level CMakeLists.txt is at /app
-COPY CMakeLists.txt ./
-COPY publisher ./publisher
-COPY subscriber ./subscriber
-RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-RUN cmake --build build --target publisher -j$(nproc)
-
-# Runtime stage
-FROM gcr.io/google.com/cloudsdktool/cloud-sdk:latest
-
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    libcurl4 \
-    libssl3 \
-    zlib1g \
-    && rm -rf /var/lib/apt/lists/*
+FROM python:3.11-slim
 
 WORKDIR /app
-COPY --from=builder /app/build/publisher/publisher /app/publisher
 
-EXPOSE 8080
+# Copy requirements and install dependencies
+COPY publisher/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY publisher/main.py .
+
+# Set environment variables
 ENV PORT=8080
 
-ENTRYPOINT ["./publisher"]
+# Run with gunicorn
+CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 main:app
