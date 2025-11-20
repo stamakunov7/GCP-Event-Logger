@@ -22,6 +22,8 @@ Set these variables for both local runs and container deployments:
 
 The subscriber expects a Spanner instance/database with an `Events` table containing the columns listed above. Both services use Application Default Credentials (ADC), so run them where the default service account has Pub/Sub and Spanner permissions or provide a service-account key via `GOOGLE_APPLICATION_CREDENTIALS`.
 
+**Note:** Using Spanner Emulator for local development due to GCP costing (~$0.30/hour per node). Set `SPANNER_EMULATOR_HOST=localhost:9010` and run `gcloud emulators spanner start --host-port=localhost:9010`. The subscriber automatically uses the emulator when this variable is set.
+
 ### Spanner schema
 Use this DDL once per database to create the table expected by the subscriber:
 
