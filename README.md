@@ -2,6 +2,8 @@
 
 Two small Python services that turn any HTTP event into a durable record inside Google Cloud. The publisher exposes a `/log` endpoint, drops every payload onto Pub/Sub, and the subscriber pulls those messages and writes them into a Spanner table. Both services expose `/health` so you can keep an eye on them.
 
+Playing around to get familiar with Spanner, Pub/sub, Cloud Run/build etc.
+
 ## What’s inside
 - `publisher/`: Flask app that accepts `{"event": "..."}` JSON and publishes to Pub/Sub.
 - `subscriber/`: Background Pub/Sub subscriber that stores each event in the `Events` table (columns `EventId`, `EventText`, `CreatedAt`) and serves a simple health check.
